@@ -7,7 +7,12 @@
 const { getStore } = require('@netlify/blobs');
 
 exports.handler = async () => {
-  const store = getStore('news');
+  // Configuração explícita (ver fetch-news-background.js para o motivo)
+  const store = getStore({
+    name: 'news',
+    siteID: process.env.BLOBS_SITE_ID,
+    token: process.env.BLOBS_TOKEN
+  });
   const data = await store.get('latest.json', { type: 'json' });
 
   return {

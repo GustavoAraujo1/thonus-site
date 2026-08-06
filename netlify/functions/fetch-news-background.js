@@ -103,7 +103,14 @@ exports.handler = async () => {
     sourceStatus
   };
 
-  const store = getStore('news');
+  // getStore('news') automático não funciona de forma confiável em Background
+  // Functions / disparo manual (o Netlify não injeta o contexto de site+token
+  // nesses casos) — por isso a configuração explícita via env vars abaixo.
+  const store = getStore({
+    name: 'news',
+    siteID: process.env.BLOBS_SITE_ID,
+    token: process.env.BLOBS_TOKEN
+  });
   await store.setJSON('latest.json', payload);
 
   console.log(
