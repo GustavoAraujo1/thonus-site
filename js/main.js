@@ -131,6 +131,106 @@
     });
   }
 
+  /* ── Notícias do setor (blog) ──────────────────────────── */
+  function formatShortDate(isoString) {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
+
+  function createNewsCard(item) {
+    const article = document.createElement('article');
+    article.className = 'news-card fade-in';
+
+    if (item.image) {
+      const thumb = document.createElement('a');
+      thumb.className = 'news-card-thumb';
+      thumb.href = item.link;
+      thumb.target = '_blank';
+      thumb.rel = 'noopener noreferrer';
+      thumb.tabIndex = -1;
+      thumb.setAttribute('aria-hidden', 'true');
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = '';
+      img.loading = 'lazy';
+      thumb.appendChild(img);
+      article.appendChild(thumb);
+    }
+
+    const info = document.createElement('div');
+    info.className = 'news-card-info';
+
+    const title = document.createElement('h3');
+    title.className = 'news-card-title';
+    const titleLink = document.createElement('a');
+    titleLink.href = item.link;
+    titleLink.target = '_blank';
+    titleLink.rel = 'noopener noreferrer';
+    titleLink.textContent = item.title;
+    title.appendChild(titleLink);
+    info.appendChild(title);
+
+    if (item.excerpt) {
+      const excerpt = document.createElement('p');
+      excerpt.className = 'news-card-excerpt';
+      excerpt.textContent = item.excerpt;
+      info.appendChild(excerpt);
+    }
+
+    const meta = document.createElement('p');
+    meta.className = 'news-card-meta';
+    const dateLabel = item.publishedAt ? formatShortDate(item.publishedAt) : '';
+    meta.textContent = item.source + (dateLabel ? ' · ' + dateLabel : '');
+    info.appendChild(meta);
+
+    article.appendChild(info);
+    return article;
+  }
+
+  const newsGrid = document.getElementById('news-grid');
+  if (newsGrid) {
+    const newsEmpty = document.getElementById('news-empty');
+    const newsUpdated = document.getElementById('news-updated');
+
+    fetch('/api/news')
+      .then(response => response.json())
+      .then(data => {
+        const items = (data && data.items) || [];
+
+        if (!items.length) {
+          if (newsEmpty) newsEmpty.hidden = false;
+          return;
+        }
+
+        items.forEach(item => newsGrid.appendChild(createNewsCard(item)));
+
+        if (newsUpdated && data.generatedAt) {
+          const updatedDate = new Date(data.generatedAt);
+          if (!isNaN(updatedDate.getTime())) {
+            const dateStr = updatedDate.toLocaleDateString('pt-BR');
+            const timeStr = updatedDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            newsUpdated.textContent = `atualizado em ${dateStr} às ${timeStr}`;
+            newsUpdated.hidden = false;
+          }
+        }
+
+        const newsObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+              newsObserver.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+        newsGrid.querySelectorAll('.fade-in').forEach(el => newsObserver.observe(el));
+      })
+      .catch(() => {
+        if (newsEmpty) newsEmpty.hidden = false;
+      });
+  }
+
   /* ── Contador de números (stats) ───────────────────────── */
   const statEls = document.querySelectorAll('[data-count]');
   if (statEls.length) {
