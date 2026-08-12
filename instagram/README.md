@@ -7,17 +7,24 @@ só gera as imagens + legenda; você revisa e sobe pelo app.
 ## Como funciona (pipeline)
 
 1. **00h00 BRT** — `fetch-news-background.js` já roda hoje e atualiza as notícias do blog.
-2. **00h15 BRT** — `generate-instagram-post.js` (novo) pega até as 5 notícias mais recentes,
-   gera uma imagem 1080x1350 por notícia (fundo fixo + título sobreposto + fonte + logo) e uma
-   legenda, e grava tudo no Netlify Blobs (store `instagram-posts`).
+2. **00h15 BRT** — `generate-instagram-post.js` pega até as 5 notícias mais recentes e monta:
+   - **1 slide por notícia**, usando a **imagem da própria notícia** (baixada da URL que já vem
+     no RSS) como fundo, com título + fonte sobrepostos. Se a notícia não tiver imagem, ou o
+     download falhar, esse slide cai num gradiente com as cores da marca.
+   - **1 slide final de encerramento**, sempre com a mesma imagem institucional fixa
+     (`instagram/assets/background.*`), **sem nenhum texto de notícia por cima** — só ela, como
+     está.
+   - Uma legenda pronta.
+   Tudo isso é gravado no Netlify Blobs (store `instagram-posts`).
 3. Você abre **`/instagram/painel.html`** no site publicado, revisa as imagens, baixa cada uma
-   e copia a legenda com um clique. Sobe pro Instagram pelo app normalmente.
+   e copia a legenda com um clique. Sobe pro Instagram pelo app normalmente. Tem um botão
+   **"gerar agora"** no painel pra disparar a geração na hora, sem esperar o horário do cron.
 
 Se num dia o agregador trouxer menos de 5 notícias, o carrossel sai com o que tiver (nunca pula o dia).
 
 ## O que você precisa fazer
 
-### 1. Trocar a imagem de fundo
+### 1. Manter a imagem institucional de encerramento
 
 Coloque o arquivo definitivo em:
 
@@ -26,11 +33,12 @@ instagram/assets/background.jpg
 ```
 
 (ou `.png`, se preferir). Recomendado: **1080 x 1350px** (proporção 4:5) — se vier em outra proporção,
-a imagem é cortada pra preencher o quadro (`object-fit: cover`), então evite fotos com elementos
-importantes muito perto das bordas.
+a imagem é cortada pra preencher o quadro (`object-fit: cover`). Essa imagem aparece **só no último
+slide do carrossel**, sem nenhuma sobreposição — pode ter texto/CTA própria "gravada" nela, já que
+não briga com nada em cima.
 
-Enquanto esse arquivo não existir, a geração usa automaticamente um fundo com gradiente nas cores
-da marca (`--color-primary` / `--color-dark` do `css/style.css`), só pra nunca travar o pipeline.
+Enquanto esse arquivo não existir, o carrossel simplesmente não tem slide de encerramento (só os
+slides de notícia).
 
 ### 2. Ajustar o texto da legenda (opcional)
 
@@ -40,9 +48,8 @@ e as hashtags diretamente ali.
 
 ### 3. Conferir o resultado
 
-Depois do primeiro deploy, espere o cron rodar (ou dispare manualmente com
-`netlify functions:invoke generate-instagram-post` via Netlify CLI) e acesse
-`https://<seu-site>/instagram/painel.html`.
+Depois do deploy, use o botão **"gerar agora"** no `/instagram/painel.html`, ou espere o cron
+das 00h15 BRT.
 
 ## Por que não publica direto no Instagram (v1)
 

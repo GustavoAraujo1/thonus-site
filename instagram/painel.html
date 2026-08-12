@@ -97,16 +97,21 @@
         data.slides.forEach((slide) => {
           const el = document.createElement('div');
           el.className = 'ig-slide';
+          const info = slide.type === 'closing'
+            ? `<div class="ig-slide-title">${slide.index}. slide de encerramento</div>
+               <div class="ig-slide-source">imagem institucional fixa, sem notícia</div>
+               <div class="ig-slide-actions">
+                 <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.png">baixar</a>
+               </div>`
+            : `<div class="ig-slide-title">${slide.index}. ${escapeHtml(slide.title)}</div>
+               <div class="ig-slide-source">fonte: ${escapeHtml(slide.source)}</div>
+               <div class="ig-slide-actions">
+                 <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.png">baixar</a>
+                 <a class="btn btn-outline" href="${slide.url}" target="_blank" rel="noopener noreferrer">notícia original</a>
+               </div>`;
           el.innerHTML = `
             <img src="/api/instagram/image?slide=${slide.index}" alt="Slide ${slide.index}" loading="lazy" />
-            <div class="ig-slide-info">
-              <div class="ig-slide-title">${slide.index}. ${escapeHtml(slide.title)}</div>
-              <div class="ig-slide-source">fonte: ${escapeHtml(slide.source)}</div>
-              <div class="ig-slide-actions">
-                <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.png">baixar</a>
-                <a class="btn btn-outline" href="${slide.url}" target="_blank" rel="noopener noreferrer">notícia original</a>
-              </div>
-            </div>`;
+            <div class="ig-slide-info">${info}</div>`;
           grid.appendChild(el);
         });
 

@@ -4,13 +4,18 @@
    depois do fetch-news-background — ver netlify.toml).
 
    Pega até 5 notícias mais recentes já agregadas pelo blog
-   (Blobs store "news", mesma fonte que o blog.html usa),
-   monta um carrossel de imagens 1080x1350 (fundo fixo + título
-   sobreposto) e uma legenda pronta, e grava tudo no Blobs store
-   "instagram-posts". O painel em instagram/painel.html lê esse
-   resultado via get-instagram-post.js / get-instagram-image.js
-   pra revisão e download manual (v1 não publica sozinho —
-   ver instagram/README.md para o porquê).
+   (Blobs store "news", mesma fonte que o blog.html usa) e monta
+   um carrossel 1080x1350:
+     - 1 slide por notícia, usando a IMAGEM DA PRÓPRIA NOTÍCIA
+       (baixada da URL que já vem no RSS) como fundo, com o
+       título sobreposto;
+     - 1 slide final de encerramento, usando SEMPRE a mesma
+       imagem institucional fixa (instagram/assets/background.*),
+       sem nenhum texto de notícia por cima — só ela, como está.
+   Grava tudo no Blobs store "instagram-posts". O painel em
+   instagram/painel.html lê esse resultado via get-instagram-post.js
+   / get-instagram-image.js pra revisão e download manual (v1 não
+   publica sozinho — ver instagram/README.md para o porquê).
    ========================================================== */
 
 const fs = require('fs');
@@ -19,7 +24,8 @@ const { getStore } = require('@netlify/blobs');
 
 const SLIDE_WIDTH = 1080;
 const SLIDE_HEIGHT = 1350;
-const MAX_SLIDES = 5;
+const MAX_NEWS_SLIDES = 5;
+const NEWS_IMAGE_FETCH_TIMEOUT_MS = 8000;
 
 const COLOR_PRIMARY = '#1e8fd5';
 const COLOR_DARK = '#1a1d20';
@@ -49,19 +55,50 @@ function loadFonts() {
   return fonts;
 }
 
-function loadBackgroundDataUri() {
+// Imagem institucional fixa — usada só no slide de encerramento (o último
+// do carrossel), sem nenhuma sobreposição de texto de notícia.
+function loadClosingImageDataUri() {
   const jpg = readAsset('background.jpg');
   if (jpg) return `data:image/jpeg;base64,${jpg.toString('base64')}`;
   const png = readAsset('background.png');
   if (png) return `data:image/png;base64,${png.toString('base64')}`;
-  // Sem imagem de fundo enviada ainda: cai num gradiente de marca
-  // pra nunca travar a geração por falta de asset (ver README).
   return null;
 }
 
 function loadLogoDataUri() {
   const logo = readAsset('images', 'logo-white.png');
   return logo ? `data:image/png;base64,${logo.toString('base64')}` : null;
+}
+
+// Baixa a imagem da própria notícia (URL do RSS) e devolve como data URI,
+// pra poder ser embutida direto no SVG sem depender de acesso externo na
+// hora de renderizar. Se não tiver imagem, ou o download falhar/demorar
+// demais, devolve null — o slide cai no gradiente de marca (ver
+// buildNewsSlideNode).
+async function fetchNewsImageDataUri(url) {
+  if (!url) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), NEWS_IMAGE_FETCH_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'THONUSBot/1.0 (+https://thonrus.com.br)' }
+    });
+    if (!res.ok) return null;
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.startsWith('image/')) return null;
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  } catch (err) {
+    console.warn(`[generate-instagram-post] Falha ao baixar imagem da notícia (${url}): ${err.message}`);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // Helper tipo hyperscript — satori aceita árvores de nó simples
@@ -79,7 +116,7 @@ function h(type, props, ...children) {
   };
 }
 
-function buildSlideNode(item, index, total, { backgroundDataUri, logoDataUri }) {
+function buildNewsSlideNode(item, index, total, { imageDataUri, logoDataUri }) {
   const fontTitleSize = item.title.length > 100 ? 46 : item.title.length > 70 ? 54 : 64;
 
   return h(
@@ -92,14 +129,14 @@ function buildSlideNode(item, index, total, { backgroundDataUri, logoDataUri }) 
         position: 'relative',
         backgroundColor: COLOR_DARK,
         fontFamily: 'Inter',
-        ...(backgroundDataUri
+        ...(imageDataUri
           ? {}
           : { backgroundImage: `linear-gradient(160deg, ${COLOR_PRIMARY} 0%, ${COLOR_DARK} 100%)` })
       }
     },
-    backgroundDataUri &&
+    imageDataUri &&
       h('img', {
-        src: backgroundDataUri,
+        src: imageDataUri,
         style: {
           position: 'absolute',
           top: 0,
@@ -232,6 +269,30 @@ function buildSlideNode(item, index, total, { backgroundDataUri, logoDataUri }) 
   );
 }
 
+// Slide de encerramento: só a imagem institucional, sem nenhuma
+// sobreposição — nem título, nem selo, nem logo, nem contador.
+function buildClosingSlideNode(imageDataUri) {
+  return h(
+    'div',
+    {
+      style: {
+        width: `${SLIDE_WIDTH}px`,
+        height: `${SLIDE_HEIGHT}px`,
+        display: 'flex',
+        position: 'relative'
+      }
+    },
+    h('img', {
+      src: imageDataUri,
+      style: {
+        width: `${SLIDE_WIDTH}px`,
+        height: `${SLIDE_HEIGHT}px`,
+        objectFit: 'cover'
+      }
+    })
+  );
+}
+
 async function renderSlidePng(node, fonts, satoriFn, Resvg) {
   const svg = await satoriFn(node, { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, fonts });
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: SLIDE_WIDTH } });
@@ -280,15 +341,16 @@ async function runGeneration() {
     token: process.env.BLOBS_TOKEN
   });
   const news = await newsStore.get('latest.json', { type: 'json' });
-  const items = (news && Array.isArray(news.items) ? news.items : []).slice(0, MAX_SLIDES);
+  const items = (news && Array.isArray(news.items) ? news.items : []).slice(0, MAX_NEWS_SLIDES);
 
   if (!items.length) {
     console.log('[generate-instagram-post] Sem notícias disponíveis hoje — nada gerado.');
     return { ok: false, reason: 'no-news' };
   }
 
-  const backgroundDataUri = loadBackgroundDataUri();
+  const closingImageDataUri = loadClosingImageDataUri();
   const logoDataUri = loadLogoDataUri();
+  const totalSlides = items.length + (closingImageDataUri ? 1 : 0);
 
   const postStore = getStore({
     name: 'instagram-posts',
@@ -296,13 +358,28 @@ async function runGeneration() {
     token: process.env.BLOBS_TOKEN
   });
 
+  // Baixa as imagens das notícias em paralelo — cada uma tem timeout
+  // próprio, então isso não vira uma soma sequencial de espera.
+  const newsImageDataUris = await Promise.all(items.map((item) => fetchNewsImageDataUri(item.image)));
+
   const slides = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const node = buildSlideNode(item, i, items.length, { backgroundDataUri, logoDataUri });
+    const node = buildNewsSlideNode(item, i, totalSlides, {
+      imageDataUri: newsImageDataUris[i],
+      logoDataUri
+    });
     const png = await renderSlidePng(node, fonts, satoriFn, Resvg);
     await postStore.set(`slide-${i + 1}.png`, new Blob([png]));
-    slides.push({ index: i + 1, title: item.title, source: item.source, url: item.link });
+    slides.push({ index: i + 1, type: 'news', title: item.title, source: item.source, url: item.link });
+  }
+
+  if (closingImageDataUri) {
+    const closingIndex = items.length + 1;
+    const node = buildClosingSlideNode(closingImageDataUri);
+    const png = await renderSlidePng(node, fonts, satoriFn, Resvg);
+    await postStore.set(`slide-${closingIndex}.png`, new Blob([png]));
+    slides.push({ index: closingIndex, type: 'closing' });
   }
 
   const generatedAt = new Date().toISOString();
