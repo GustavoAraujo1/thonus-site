@@ -256,7 +256,11 @@ function buildCaption(items) {
   ].join('\n');
 }
 
-exports.handler = async () => {
+// Lógica principal, exportada à parte pra poder ser chamada tanto pelo
+// cron (exports.handler abaixo) quanto pelo endpoint manual
+// (netlify/functions/trigger-instagram-post.js — botão "gerar agora"
+// do instagram/painel.html).
+async function runGeneration() {
   // satori/@resvg-js podem publicar como ESM — import() dinâmico funciona
   // pra CJS e ESM, então evita depender do formato exato do pacote.
   const satoriModule = await import('satori');
@@ -267,7 +271,7 @@ exports.handler = async () => {
   const fonts = loadFonts();
   if (!fonts.length) {
     console.error('[generate-instagram-post] Nenhuma fonte encontrada em instagram/assets/fonts — abortando.');
-    return;
+    return { ok: false, reason: 'missing-fonts' };
   }
 
   const newsStore = getStore({
@@ -280,7 +284,7 @@ exports.handler = async () => {
 
   if (!items.length) {
     console.log('[generate-instagram-post] Sem notícias disponíveis hoje — nada gerado.');
-    return;
+    return { ok: false, reason: 'no-news' };
   }
 
   const backgroundDataUri = loadBackgroundDataUri();
@@ -301,12 +305,20 @@ exports.handler = async () => {
     slides.push({ index: i + 1, title: item.title, source: item.source, url: item.link });
   }
 
+  const generatedAt = new Date().toISOString();
   await postStore.setJSON('latest.json', {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     totalSlides: slides.length,
     caption: buildCaption(items),
     slides
   });
 
   console.log(`[generate-instagram-post] ${slides.length} slide(s) gerado(s) a partir de ${items.length} notícia(s) do dia.`);
+  return { ok: true, generatedAt, totalSlides: slides.length };
+}
+
+exports.runGeneration = runGeneration;
+
+exports.handler = async () => {
+  await runGeneration();
 };

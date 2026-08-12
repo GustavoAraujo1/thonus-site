@@ -24,6 +24,11 @@
     .ig-slide-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .ig-slide-actions a, .ig-slide-actions button { font-size:.78rem; padding:8px 14px; }
     .ig-empty { text-align:center; color:var(--color-text-muted); padding:64px 24px; }
+    .ig-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:32px; }
+    .ig-toolbar .ig-status { margin-bottom:0; }
+    .ig-generate-msg { font-size:.85rem; margin-top:8px; }
+    .ig-generate-msg.error { color:#c0392b; }
+    .ig-generate-msg.success { color:var(--color-primary); }
   </style>
 </head>
 <body>
@@ -37,7 +42,12 @@
     <span class="label">carrossel do dia</span>
     <h1 class="heading-lg" style="margin-bottom:8px">revisar e baixar o post</h1>
     <div class="divider" style="margin-bottom:16px"></div>
-    <p class="ig-status" id="ig-status">carregando...</p>
+
+    <div class="ig-toolbar">
+      <p class="ig-status" id="ig-status">carregando...</p>
+      <button class="btn btn-dark" id="ig-generate-now">gerar agora</button>
+    </div>
+    <p class="ig-generate-msg" id="ig-generate-msg" hidden></p>
 
     <div id="ig-caption-container" hidden>
       <div class="ig-caption-box">
@@ -120,6 +130,46 @@
       } catch {
         textarea.select();
         document.execCommand('copy');
+      }
+    });
+
+    const GENERATE_ERROR_MESSAGES = {
+      'no-news': 'sem notícias novas disponíveis no agregador do blog no momento — tente de novo mais tarde.',
+      'missing-fonts': 'erro de configuração: fontes não encontradas no servidor. avise o desenvolvedor.',
+      'error': 'erro inesperado ao gerar o carrossel. avise o desenvolvedor.'
+    };
+
+    document.getElementById('ig-generate-now').addEventListener('click', async () => {
+      const btn = document.getElementById('ig-generate-now');
+      const msgEl = document.getElementById('ig-generate-msg');
+      const originalText = btn.textContent;
+
+      btn.disabled = true;
+      btn.textContent = 'gerando...';
+      msgEl.hidden = true;
+
+      try {
+        const res = await fetch('/api/instagram/generate', { method: 'POST' });
+        const data = await res.json();
+
+        if (data.ok) {
+          msgEl.textContent = `carrossel gerado com sucesso (${data.totalSlides} slide(s)).`;
+          msgEl.className = 'ig-generate-msg success';
+          msgEl.hidden = false;
+          await loadPost();
+        } else {
+          msgEl.textContent = GENERATE_ERROR_MESSAGES[data.reason] || 'não foi possível gerar o carrossel agora.';
+          msgEl.className = 'ig-generate-msg error';
+          msgEl.hidden = false;
+        }
+      } catch (err) {
+        msgEl.textContent = 'erro de conexão ao tentar gerar o carrossel.';
+        msgEl.className = 'ig-generate-msg error';
+        msgEl.hidden = false;
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
       }
     });
 

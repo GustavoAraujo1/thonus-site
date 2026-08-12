@@ -14,6 +14,11 @@
   schedule = "15 3 * * *"
   included_files = ["instagram/assets/**"]
 
+# Mesma geração, mas disparável sob demanda (POST) pelo botão "gerar agora"
+# do painel — funções agendadas não podem ser chamadas direto por HTTP.
+[functions."trigger-instagram-post"]
+  included_files = ["instagram/assets/**"]
+
 [[redirects]]
   from = "/api/news"
   to = "/.netlify/functions/get-news"
@@ -27,4 +32,9 @@
 [[redirects]]
   from = "/api/instagram/image"
   to = "/.netlify/functions/get-instagram-image"
+  status = 200
+
+[[redirects]]
+  from = "/api/instagram/generate"
+  to = "/.netlify/functions/trigger-instagram-post"
   status = 200
