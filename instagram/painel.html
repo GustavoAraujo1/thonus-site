@@ -78,8 +78,12 @@
         if (!data.totalSlides) {
           statusEl.hidden = true;
           emptyEl.hidden = false;
+          containerEl.hidden = true;
           return;
         }
+
+        statusEl.hidden = false;
+        emptyEl.hidden = true;
 
         const generated = data.generatedAt ? new Date(data.generatedAt) : null;
         statusEl.textContent = generated
