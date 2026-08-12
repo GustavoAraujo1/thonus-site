@@ -91,10 +91,10 @@ function buildSlideNode(item, index, total, { backgroundDataUri, logoDataUri }) 
         display: 'flex',
         position: 'relative',
         backgroundColor: COLOR_DARK,
-        backgroundImage: backgroundDataUri
-          ? undefined
-          : `linear-gradient(160deg, ${COLOR_PRIMARY} 0%, ${COLOR_DARK} 100%)`,
-        fontFamily: 'Inter'
+        fontFamily: 'Inter',
+        ...(backgroundDataUri
+          ? {}
+          : { backgroundImage: `linear-gradient(160deg, ${COLOR_PRIMARY} 0%, ${COLOR_DARK} 100%)` })
       }
     },
     backgroundDataUri &&
