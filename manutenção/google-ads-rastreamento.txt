@@ -1,0 +1,59 @@
+THONUS Engenharia — Rastreamento de conversão (GA4 + Google Ads)
+==========================================================================
+
+O QUE JÁ FOI FEITO (2026-08-12)
+--------------------------------
+1. Tag do GA4 (gtag.js) instalada no <head> de todas as 8 páginas públicas:
+   index, sobre, servicos, clientes, portfolio, blog, contato,
+   politica-privacidade.
+   Measurement ID: G-ZKCRWF2PZF (propriedade "Thonrus", stream ID 15422455059)
+
+   Não foi instalada em instagram/login.html nem instagram/painel.html —
+   são páginas internas do parceiro, bloqueadas no robots.txt, sem
+   relevância para a campanha.
+
+2. Três eventos de conversão instrumentados em js/main.js (trackLead):
+   - clique em qualquer link do WhatsApp (href começando com
+     "https://wa.me/")            -> gtag('event','generate_lead',{method:'whatsapp'})
+   - clique em qualquer link "tel:" -> method:'telefone'
+   - envio bem-sucedido do formulário de contato (Web3Forms) -> method:'formulario'
+
+   Usei o evento recomendado do GA4 "generate_lead" para os três, variando
+   só o parâmetro "method". Isso deixa fácil marcar UM único Key Event no
+   GA4 que já cobre as três formas de contato, e depois importar esse
+   mesmo Key Event como conversão no Google Ads (sem precisar reescrever
+   código quando a conta do Ads existir).
+
+PENDÊNCIAS (o que falta pra campanha rodar de verdade)
+--------------------------------------------------------
+1. Terminar a criação da conta do Google Ads (estava parada na etapa
+   "Adicionar informações comerciais" em 2026-08-12).
+
+2. Depois que a conta existir, LINKAR o Google Ads à propriedade GA4
+   "Thonrus" (Configurações do Google Ads > Ferramentas > Links > Google
+   Analytics). Isso é o caminho mais simples — não precisa colar nenhuma
+   tag AW- nova no site.
+
+3. No GA4, marcar o evento "generate_lead" como Key Event (Admin >
+   Eventos > Marcar como Key Event), se ainda não estiver marcado
+   automaticamente.
+
+4. No Google Ads, em Conversões, importar o Key Event "generate_lead" do
+   GA4 como ação de conversão. Dá pra ver o breakdown por canal filtrando
+   pelo parâmetro "method" (whatsapp / telefone / formulario) direto no
+   relatório do GA4, se quiser saber qual canal converte mais.
+
+5. CONFIRMAR que os dados estão chegando: o GA4 mostrou o aviso "a coleta
+   de dados não está ativa" antes dessa mudança (porque a tag não estava
+   instalada). Depois do deploy, checar em Relatórios > Tempo real e
+   confirmar que aparecem eventos "page_view" e "generate_lead" ao navegar
+   no site e testar os 3 CTAs.
+
+NÃO FIZ (e por quê)
+---------------------
+- Não instalei uma tag AW- (Google Ads Conversion Tag) separada porque a
+  conta do Google Ads ainda não existe e o ID (AW-XXXXXXXXX) não estava
+  disponível. O caminho de importar via GA4 (item 2 acima) evita ter que
+  colar uma segunda tag no código depois — mas se no futuro preferir uma
+  tag Ads nativa, é só adicionar mais uma linha gtag('config','AW-XXX')
+  nos mesmos blocos <script> já instalados em cada página.

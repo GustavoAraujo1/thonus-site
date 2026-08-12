@@ -93,6 +93,24 @@
   const yearEl = document.getElementById('year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
 
+  /* ── Rastreamento de conversão (GA4) ────────────────────── */
+  function trackLead(method) {
+    if (typeof gtag === 'function') {
+      gtag('event', 'generate_lead', { method: method });
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (href.startsWith('https://wa.me/')) {
+      trackLead('whatsapp');
+    } else if (href.startsWith('tel:')) {
+      trackLead('telefone');
+    }
+  });
+
   /* ── Formulário de contato (Web3Forms) ─────────────────── */
   const contactForm = document.getElementById('contact-form');
   if (contactForm) {
@@ -118,6 +136,7 @@
           statusEl.textContent = 'mensagem enviada com sucesso! entraremos em contato em breve.';
           statusEl.classList.add('form-status-success');
           contactForm.reset();
+          trackLead('formulario');
         } else {
           throw new Error(result.message || 'falha no envio');
         }
