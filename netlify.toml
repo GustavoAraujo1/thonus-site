@@ -9,7 +9,22 @@
 [functions."fetch-news-background"]
   schedule = "0 3 * * *"
 
+# Gera o carrossel do Instagram 15min depois, já com as notícias do dia prontas
+[functions."generate-instagram-post"]
+  schedule = "15 3 * * *"
+  included_files = ["instagram/assets/**"]
+
 [[redirects]]
   from = "/api/news"
   to = "/.netlify/functions/get-news"
+  status = 200
+
+[[redirects]]
+  from = "/api/instagram/post"
+  to = "/.netlify/functions/get-instagram-post"
+  status = 200
+
+[[redirects]]
+  from = "/api/instagram/image"
+  to = "/.netlify/functions/get-instagram-image"
   status = 200

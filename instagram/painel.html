@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Painel Instagram — THONUS Engenharia</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📷</text></svg>" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .ig-header { display:flex; align-items:center; gap:16px; padding:24px; border-bottom:1px solid var(--color-border); }
+    .ig-header img { height:32px; }
+    .ig-wrap { max-width:var(--max-width); margin:0 auto; padding:48px 24px; }
+    .ig-status { color:var(--color-text-muted); font-size:.9rem; margin-bottom:32px; }
+    .ig-caption-box { background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:var(--radius-card); padding:24px; margin-bottom:48px; }
+    .ig-caption-box textarea { width:100%; min-height:200px; border:none; background:transparent; resize:vertical; font-family:var(--font-body); font-size:.95rem; line-height:1.6; color:var(--color-text); }
+    .ig-caption-actions { display:flex; justify-content:flex-end; margin-top:12px; }
+    .ig-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:24px; }
+    .ig-slide { border:1px solid var(--color-border); border-radius:var(--radius-card); overflow:hidden; background:var(--color-white); box-shadow:var(--shadow); }
+    .ig-slide img { width:100%; aspect-ratio:4/5; object-fit:cover; display:block; background:var(--color-bg-alt); }
+    .ig-slide-info { padding:16px; }
+    .ig-slide-info .ig-slide-title { font-size:.85rem; font-weight:600; margin-bottom:8px; line-height:1.4; }
+    .ig-slide-info .ig-slide-source { font-size:.75rem; color:var(--color-text-muted); margin-bottom:12px; }
+    .ig-slide-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .ig-slide-actions a, .ig-slide-actions button { font-size:.78rem; padding:8px 14px; }
+    .ig-empty { text-align:center; color:var(--color-text-muted); padding:64px 24px; }
+  </style>
+</head>
+<body>
+
+  <header class="ig-header">
+    <a href="../index.html"><img src="../assets/images/logo.png" alt="THONUS Engenharia" /></a>
+    <span style="font-family:var(--font-title);font-weight:700;color:var(--color-text-muted)">painel interno · instagram</span>
+  </header>
+
+  <main class="ig-wrap">
+    <span class="label">carrossel do dia</span>
+    <h1 class="heading-lg" style="margin-bottom:8px">revisar e baixar o post</h1>
+    <div class="divider" style="margin-bottom:16px"></div>
+    <p class="ig-status" id="ig-status">carregando...</p>
+
+    <div id="ig-caption-container" hidden>
+      <div class="ig-caption-box">
+        <textarea id="ig-caption" readonly></textarea>
+        <div class="ig-caption-actions">
+          <button class="btn btn-primary" id="ig-copy-caption">copiar legenda</button>
+        </div>
+      </div>
+      <div class="ig-grid" id="ig-grid"></div>
+    </div>
+
+    <p class="ig-empty" id="ig-empty" hidden>
+      ainda não há um carrossel gerado. ele roda automaticamente todo dia às 00h15 (horário de Brasília),
+      logo depois do agregador de notícias do blog.
+    </p>
+  </main>
+
+  <script>
+    async function loadPost() {
+      const statusEl = document.getElementById('ig-status');
+      const emptyEl = document.getElementById('ig-empty');
+      const containerEl = document.getElementById('ig-caption-container');
+
+      try {
+        const res = await fetch('/api/instagram/post');
+        const data = await res.json();
+
+        if (!data.totalSlides) {
+          statusEl.hidden = true;
+          emptyEl.hidden = false;
+          return;
+        }
+
+        const generated = data.generatedAt ? new Date(data.generatedAt) : null;
+        statusEl.textContent = generated
+          ? `gerado em ${generated.toLocaleDateString('pt-BR')} às ${generated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${data.totalSlides} slide(s)`
+          : `${data.totalSlides} slide(s)`;
+
+        document.getElementById('ig-caption').value = data.caption || '';
+
+        const grid = document.getElementById('ig-grid');
+        grid.innerHTML = '';
+        data.slides.forEach((slide) => {
+          const el = document.createElement('div');
+          el.className = 'ig-slide';
+          el.innerHTML = `
+            <img src="/api/instagram/image?slide=${slide.index}" alt="Slide ${slide.index}" loading="lazy" />
+            <div class="ig-slide-info">
+              <div class="ig-slide-title">${slide.index}. ${escapeHtml(slide.title)}</div>
+              <div class="ig-slide-source">fonte: ${escapeHtml(slide.source)}</div>
+              <div class="ig-slide-actions">
+                <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.png">baixar</a>
+                <a class="btn btn-outline" href="${slide.url}" target="_blank" rel="noopener noreferrer">notícia original</a>
+              </div>
+            </div>`;
+          grid.appendChild(el);
+        });
+
+        containerEl.hidden = false;
+      } catch (err) {
+        statusEl.textContent = 'erro ao carregar o post do dia.';
+        console.error(err);
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    document.getElementById('ig-copy-caption').addEventListener('click', async () => {
+      const textarea = document.getElementById('ig-caption');
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+        const btn = document.getElementById('ig-copy-caption');
+        const original = btn.textContent;
+        btn.textContent = 'copiado!';
+        setTimeout(() => { btn.textContent = original; }, 1800);
+      } catch {
+        textarea.select();
+        document.execCommand('copy');
+      }
+    });
+
+    loadPost();
+  </script>
+</body>
+</html>
