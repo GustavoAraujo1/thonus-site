@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Área do Parceiro — THONUS Engenharia</title>
+  <meta name="description" content="Acesso exclusivo para parceiros THONUS Engenharia." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    body { background: var(--color-bg-alt); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .partner-card { max-width: 380px; width: 100%; background: var(--color-white); border: 1px solid var(--color-border); border-radius: var(--radius-card); box-shadow: var(--shadow); padding: 40px 32px; }
+    .partner-card img { height: 36px; display: block; margin: 0 auto 24px; }
+    .partner-card h1 { font-family: var(--font-title); font-size: 1.5rem; text-align: center; margin-bottom: 8px; }
+    .partner-card p.sub { text-align: center; color: var(--color-text-muted); font-size: .9rem; margin-bottom: 28px; }
+    .partner-field { margin-bottom: 16px; }
+    .partner-field label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 6px; }
+    .partner-field input { width: 100%; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius); font-family: var(--font-body); font-size: .95rem; }
+    .partner-field input:focus { outline: none; border-color: var(--color-primary); }
+    .partner-submit { width: 100%; margin-top: 8px; }
+    .partner-error { color: #c0392b; font-size: .85rem; text-align: center; margin-top: 16px; }
+  </style>
+</head>
+<body>
+
+  <div class="partner-card">
+    <img src="../assets/images/logo.png" alt="THONUS Engenharia" />
+    <h1>área do parceiro</h1>
+    <p class="sub">acesso restrito — informe suas credenciais</p>
+
+    <form id="partner-login-form">
+      <div class="partner-field">
+        <label for="username">usuário</label>
+        <input type="text" id="username" name="username" autocomplete="username" required />
+      </div>
+      <div class="partner-field">
+        <label for="password">senha</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary partner-submit" id="partner-submit-btn">entrar</button>
+      <p class="partner-error" id="partner-error" hidden></p>
+    </form>
+  </div>
+
+  <script>
+    async function checkExistingSession() {
+      try {
+        const res = await fetch('/api/partner/check');
+        const data = await res.json();
+        if (data.authenticated) {
+          window.location.replace('painel.html');
+        }
+      } catch {
+        // segue exibindo o formulário normalmente
+      }
+    }
+
+    document.getElementById('partner-login-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const btn = document.getElementById('partner-submit-btn');
+      const errorEl = document.getElementById('partner-error');
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      btn.disabled = true;
+      btn.textContent = 'entrando...';
+      errorEl.hidden = true;
+
+      try {
+        const res = await fetch('/api/partner/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          window.location.replace('painel.html');
+          return;
+        }
+
+        errorEl.textContent = data.reason === 'not-configured'
+          ? 'login ainda não configurado — avise o desenvolvedor.'
+          : 'usuário ou senha inválidos.';
+        errorEl.hidden = false;
+      } catch {
+        errorEl.textContent = 'erro de conexão. tente novamente.';
+        errorEl.hidden = false;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'entrar';
+      }
+    });
+
+    checkExistingSession();
+  </script>
+</body>
+</html>

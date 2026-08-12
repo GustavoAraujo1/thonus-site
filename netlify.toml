@@ -38,3 +38,18 @@
   from = "/api/instagram/generate"
   to = "/.netlify/functions/trigger-instagram-post"
   status = 200
+
+[[redirects]]
+  from = "/api/partner/login"
+  to = "/.netlify/functions/partner-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/partner/check"
+  to = "/.netlify/functions/partner-check"
+  status = 200
+
+[[redirects]]
+  from = "/api/partner/logout"
+  to = "/.netlify/functions/partner-logout"
+  status = 200

@@ -16,11 +16,33 @@ só gera as imagens + legenda; você revisa e sobe pelo app.
      está.
    - Uma legenda pronta.
    Tudo isso é gravado no Netlify Blobs (store `instagram-posts`).
-3. Você abre **`/instagram/painel.html`** no site publicado, revisa as imagens, baixa cada uma
-   e copia a legenda com um clique. Sobe pro Instagram pelo app normalmente. Tem um botão
-   **"gerar agora"** no painel pra disparar a geração na hora, sem esperar o horário do cron.
+3. Você entra pelo link **"sou parceiro"** no menu do site (ao lado de "seja parceiro" — é o
+   disfarce), faz login e cai direto no painel. Lá revisa as imagens, baixa cada uma e copia a
+   legenda com um clique. Sobe pro Instagram pelo app normalmente. Tem um botão **"gerar agora"**
+   no painel pra disparar a geração na hora, sem esperar o horário do cron.
 
 Se num dia o agregador trouxer menos de 5 notícias, o carrossel sai com o que tiver (nunca pula o dia).
+
+## Login (obrigatório antes de usar)
+
+O painel e as functions que ele usa (`get-instagram-post`, `get-instagram-image`,
+`trigger-instagram-post`) só respondem com uma sessão válida — sem isso, é tudo `401`. A sessão
+vem de um cookie assinado (HMAC), sem banco de dados (ver `netlify/functions/lib/auth.js`).
+
+**Antes de usar pela primeira vez, configure 3 variáveis de ambiente no painel da Netlify**
+(Site settings → Environment variables):
+
+| Variável                 | O que é                                                             |
+|---------------------------|----------------------------------------------------------------------|
+| `PARTNER_USER`             | usuário de login que você escolher                                   |
+| `PARTNER_PASSWORD`         | senha de login que você escolher                                     |
+| `PARTNER_SESSION_SECRET`   | uma string aleatória longa, só pra assinar o cookie (não é login)    |
+
+Sem essas 3 variáveis configuradas, o login sempre falha (`not-configured`). A sessão dura 7 dias
+(`SESSION_MAX_AGE_SECONDS` em `lib/auth.js`) — depois disso, pede login de novo.
+
+**Fluxo:** menu → "sou parceiro" → `instagram/login.html` → login correto → redireciona pra
+`instagram/painel.html`. Botão "sair" no painel limpa a sessão.
 
 ## O que você precisa fazer
 
@@ -71,10 +93,14 @@ Instagram porque a plataforma não permite link clicável em legenda.
 ```
 instagram/
 ├── README.md              este arquivo
-├── painel.html             painel de revisão/download (sem link no menu do site, noindex)
+├── login.html              tela de login ("sou parceiro" no menu), noindex
+├── painel.html             painel de revisão/download, protegido por sessão, noindex
 ├── assets/
-│   ├── background.jpg      (você adiciona) imagem de fundo fixa dos cards
+│   ├── background.jpg      (você adiciona) imagem do slide de encerramento
 │   ├── fonts/               fontes usadas no card (mesmas do site: Barlow Condensed + Inter)
 │   └── images/logo-white.png  cópia do logo (bundlada junto com a function via included_files)
 └── output/                  pasta livre pra testes/exports manuais, se precisar
 ```
+
+Lógica de login: `netlify/functions/lib/auth.js` (sessão), `partner-login.js`, `partner-check.js`,
+`partner-logout.js`.
