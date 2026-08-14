@@ -65,7 +65,7 @@
           observer.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0.01, rootMargin: '0px 0px 100px 0px' });
 
     fadeEls.forEach(el => observer.observe(el));
   }
@@ -241,7 +241,7 @@
               newsObserver.unobserve(entry.target);
             }
           });
-        }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+        }, { threshold: 0.01, rootMargin: '0px 0px 100px 0px' });
 
         newsGrid.querySelectorAll('.fade-in').forEach(el => newsObserver.observe(el));
       })
