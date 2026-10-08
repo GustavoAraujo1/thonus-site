@@ -53,3 +53,42 @@
   from = "/api/partner/logout"
   to = "/.netlify/functions/partner-logout"
   status = 200
+
+# publish = "." publica o repositório inteiro — estes caminhos não são site.
+# ponytail: lista de bloqueio; pasta interna nova precisa de uma linha aqui
+# (ou mover o site para public/ e publicar só ela).
+[[redirects]]
+  from = "/netlify/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/manutenção/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/manuten%C3%A7%C3%A3o/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/backup/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/package.json"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/instagram/README.md"
+  to = "/404.html"
+  status = 404
+  force = true
