@@ -19,6 +19,11 @@
 [functions."trigger-instagram-post"]
   included_files = ["instagram/assets/**"]
 
+# Renova o token do Instagram toda segunda 06:00 UTC — vale 60 dias e só
+# renova enquanto válido, então semanal nunca deixa expirar.
+[functions."refresh-instagram-token"]
+  schedule = "0 6 * * 1"
+
 [[redirects]]
   from = "/api/news"
   to = "/.netlify/functions/get-news"
@@ -37,6 +42,11 @@
 [[redirects]]
   from = "/api/instagram/generate"
   to = "/.netlify/functions/trigger-instagram-post"
+  status = 200
+
+[[redirects]]
+  from = "/api/instagram/publish"
+  to = "/.netlify/functions/publish-instagram-post"
   status = 200
 
 [[redirects]]

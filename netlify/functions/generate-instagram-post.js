@@ -14,18 +14,21 @@
        sem nenhum texto de notícia por cima — só ela, como está.
    Grava tudo no Blobs store "instagram-posts". O painel em
    instagram/painel.html lê esse resultado via get-instagram-post.js
-   / get-instagram-image.js pra revisão e download manual (v1 não
-   publica sozinho — ver instagram/README.md para o porquê).
+   / get-instagram-image.js pra revisão; o botão "publicar" do
+   painel publica via API oficial (publish-instagram-post.js).
    ========================================================== */
 
 const fs = require('fs');
 const path = require('path');
 const { getStore } = require('@netlify/blobs');
+const jpeg = require('jpeg-js');
 
 const SLIDE_WIDTH = 1080;
 const SLIDE_HEIGHT = 1350;
 const MAX_NEWS_SLIDES = 5;
 const NEWS_IMAGE_FETCH_TIMEOUT_MS = 8000;
+const JPEG_QUALITY = 90;
+const PANEL_URL = 'https://thonrus.com.br/instagram/painel.html';
 
 const COLOR_PRIMARY = '#1e8fd5';
 const COLOR_DARK = '#1a1d20';
@@ -293,10 +296,13 @@ function buildClosingSlideNode(imageDataUri) {
   );
 }
 
-async function renderSlidePng(node, fonts, satoriFn, Resvg) {
+// JPEG porque é o único formato que a API de publicação do Instagram aceita.
+// Fundo opaco garante que os pixels (RGBA) saiam sem transparência pro encoder.
+async function renderSlideJpeg(node, fonts, satoriFn, Resvg) {
   const svg = await satoriFn(node, { width: SLIDE_WIDTH, height: SLIDE_HEIGHT, fonts });
-  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: SLIDE_WIDTH } });
-  return resvg.render().asPng();
+  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: SLIDE_WIDTH }, background: COLOR_DARK });
+  const rendered = resvg.render();
+  return jpeg.encode({ data: rendered.pixels, width: rendered.width, height: rendered.height }, JPEG_QUALITY).data;
 }
 
 function numberEmoji(n) {
@@ -369,16 +375,16 @@ async function runGeneration() {
       imageDataUri: newsImageDataUris[i],
       logoDataUri
     });
-    const png = await renderSlidePng(node, fonts, satoriFn, Resvg);
-    await postStore.set(`slide-${i + 1}.png`, new Blob([png]));
+    const image = await renderSlideJpeg(node, fonts, satoriFn, Resvg);
+    await postStore.set(`slide-${i + 1}.jpg`, new Blob([image]));
     slides.push({ index: i + 1, type: 'news', title: item.title, source: item.source, url: item.link });
   }
 
   if (closingImageDataUri) {
     const closingIndex = items.length + 1;
     const node = buildClosingSlideNode(closingImageDataUri);
-    const png = await renderSlidePng(node, fonts, satoriFn, Resvg);
-    await postStore.set(`slide-${closingIndex}.png`, new Blob([png]));
+    const image = await renderSlideJpeg(node, fonts, satoriFn, Resvg);
+    await postStore.set(`slide-${closingIndex}.jpg`, new Blob([image]));
     slides.push({ index: closingIndex, type: 'closing' });
   }
 
@@ -396,6 +402,23 @@ async function runGeneration() {
 
 exports.runGeneration = runGeneration;
 
+// Aviso no celular pelo app ntfy (opcional): só roda se NTFY_TOPIC existir
+// na Netlify. O tópico funciona como senha — use um nome longo e aleatório.
+async function notifyReady(result) {
+  const topic = process.env.NTFY_TOPIC;
+  if (!topic || !result.ok) return;
+  try {
+    await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+      method: 'POST',
+      headers: { Title: 'THONUS - carrossel do dia pronto', Click: PANEL_URL, Tags: 'camera' },
+      body: `${result.totalSlides} slides prontos. Toque para revisar e publicar.`
+    });
+  } catch (err) {
+    console.warn(`[generate-instagram-post] Falha ao enviar aviso ntfy: ${err.message}`);
+  }
+}
+
+// Só o cron avisa — o "gerar agora" do painel já está com você na frente.
 exports.handler = async () => {
-  await runGeneration();
+  await notifyReady(await runGeneration());
 };

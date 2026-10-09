@@ -42,6 +42,34 @@ function verifySessionToken(token) {
   }
 }
 
+// Token curto só pras imagens dos slides: na hora de publicar, a Meta baixa
+// cada slide direto do nosso servidor, sem cookie. O prefixo "media:" faz
+// esse token não valer como sessão (Number("media:...") é NaN) e a sessão
+// não valer aqui — se ele vazar num log da Meta, abre só as imagens, por 1h.
+const MEDIA_TOKEN_PREFIX = 'media:';
+
+function createMediaToken(maxAgeSeconds = 60 * 60) {
+  const payload = `${MEDIA_TOKEN_PREFIX}${Date.now() + maxAgeSeconds * 1000}`;
+  const sig = crypto.createHmac('sha256', getSecret()).update(payload).digest('hex');
+  return Buffer.from(`${payload}.${sig}`).toString('base64url');
+}
+
+function verifyMediaToken(token) {
+  try {
+    const [payload, sig] = Buffer.from(String(token), 'base64url').toString('utf8').split('.');
+    if (!payload || !sig || !payload.startsWith(MEDIA_TOKEN_PREFIX)) return false;
+
+    const expectedSig = crypto.createHmac('sha256', getSecret()).update(payload).digest('hex');
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expectedBuf = Buffer.from(expectedSig, 'hex');
+    if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return false;
+
+    return Number(payload.slice(MEDIA_TOKEN_PREFIX.length)) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 function timingSafeStringEqual(a, b) {
   const bufA = Buffer.from(String(a));
   const bufB = Buffer.from(String(b));
@@ -78,6 +106,8 @@ module.exports = {
   SESSION_MAX_AGE_SECONDS,
   createSessionToken,
   verifySessionToken,
+  createMediaToken,
+  verifyMediaToken,
   timingSafeStringEqual,
   isAuthenticated,
   buildSessionCookie,

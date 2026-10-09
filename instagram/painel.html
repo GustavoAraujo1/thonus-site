@@ -14,7 +14,7 @@
     .ig-status { color:var(--color-text-muted); font-size:.9rem; margin-bottom:32px; }
     .ig-caption-box { background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:var(--radius-card); padding:24px; margin-bottom:48px; }
     .ig-caption-box textarea { width:100%; min-height:200px; border:none; background:transparent; resize:vertical; font-family:var(--font-body); font-size:.95rem; line-height:1.6; color:var(--color-text); }
-    .ig-caption-actions { display:flex; justify-content:flex-end; margin-top:12px; }
+    .ig-caption-actions { display:flex; justify-content:flex-end; gap:12px; flex-wrap:wrap; margin-top:12px; }
     .ig-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:24px; }
     .ig-slide { border:1px solid var(--color-border); border-radius:var(--radius-card); overflow:hidden; background:var(--color-white); box-shadow:var(--shadow); }
     .ig-slide img { width:100%; aspect-ratio:4/5; object-fit:cover; display:block; background:var(--color-bg-alt); }
@@ -70,10 +70,12 @@
 
       <div id="ig-caption-container" hidden>
         <div class="ig-caption-box">
-          <textarea id="ig-caption" readonly></textarea>
+          <textarea id="ig-caption" aria-label="legenda (editável antes de publicar)"></textarea>
           <div class="ig-caption-actions">
-            <button class="btn btn-primary" id="ig-copy-caption">copiar legenda</button>
+            <button class="btn btn-outline" id="ig-copy-caption">copiar legenda</button>
+            <button class="btn btn-primary" id="ig-publish">publicar no instagram</button>
           </div>
+          <p class="ig-generate-msg" id="ig-publish-msg" hidden></p>
         </div>
         <div class="ig-grid" id="ig-grid"></div>
       </div>
@@ -187,6 +189,7 @@
           : `${data.totalSlides} slide(s)`;
 
         document.getElementById('ig-caption').value = data.caption || '';
+        showPublished(data.published);
 
         const grid = document.getElementById('ig-grid');
         grid.innerHTML = '';
@@ -197,12 +200,12 @@
             ? `<div class="ig-slide-title">${slide.index}. slide de encerramento</div>
                <div class="ig-slide-source">imagem institucional fixa, sem notícia</div>
                <div class="ig-slide-actions">
-                 <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.png">baixar</a>
+                 <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.jpg">baixar</a>
                </div>`
-            : `<div class="ig-slide-title">${slide.index}. ${escapeHtml(slide.title)}</div>
+            :`<div class="ig-slide-title">${slide.index}. ${escapeHtml(slide.title)}</div>
                <div class="ig-slide-source">fonte: ${escapeHtml(slide.source)}</div>
                <div class="ig-slide-actions">
-                 <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.png">baixar</a>
+                 <a class="btn btn-outline" href="/api/instagram/image?slide=${slide.index}" download="thonus-instagram-slide-${slide.index}.jpg">baixar</a>
                  <a class="btn btn-outline" href="${slide.url}" target="_blank" rel="noopener noreferrer">notícia original</a>
                </div>`;
           el.innerHTML = `
@@ -279,6 +282,72 @@
       } finally {
         btn.disabled = false;
         btn.textContent = originalText;
+      }
+    });
+
+    const PUBLISH_ERROR_MESSAGES = {
+      'no-post': 'não há carrossel gerado pra publicar.',
+      'missing-token': 'falta configurar o IG_ACCESS_TOKEN na Netlify (ver instagram/README.md).',
+      'caption-too-long': 'a legenda passou de 2.200 caracteres, o limite do Instagram.',
+      'instagram-error': 'o Instagram recusou a publicação'
+    };
+
+    function showPublished(published) {
+      const btn = document.getElementById('ig-publish');
+      const msgEl = document.getElementById('ig-publish-msg');
+      if (!published) {
+        btn.disabled = false;
+        btn.textContent = 'publicar no instagram';
+        msgEl.hidden = true;
+        return;
+      }
+      const at = new Date(published.at);
+      btn.disabled = true;
+      btn.textContent = 'publicado';
+      msgEl.className = 'ig-generate-msg success';
+      msgEl.innerHTML = `publicado em ${at.toLocaleDateString('pt-BR')} às ${at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · `
+        + `<a href="${encodeURI(published.permalink || 'https://www.instagram.com/projeto_thonrus/')}" target="_blank" rel="noopener noreferrer">ver no instagram</a>`;
+      msgEl.hidden = false;
+    }
+
+    document.getElementById('ig-publish').addEventListener('click', async () => {
+      if (!confirm('Publicar este carrossel no @projeto_thonrus agora? Não dá pra desfazer pelo painel.')) return;
+
+      const btn = document.getElementById('ig-publish');
+      const msgEl = document.getElementById('ig-publish-msg');
+      btn.disabled = true;
+      btn.textContent = 'publicando...';
+      msgEl.hidden = true;
+
+      try {
+        const res = await fetch('/api/instagram/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ caption: document.getElementById('ig-caption').value })
+        });
+        if (res.status === 401) {
+          window.location.replace('login.html');
+          return;
+        }
+        const data = await res.json();
+
+        if (data.ok || data.reason === 'already-published') {
+          await loadPost();
+          return;
+        }
+        const base = PUBLISH_ERROR_MESSAGES[data.reason] || 'não foi possível publicar agora';
+        msgEl.textContent = data.message ? `${base}: ${data.message}` : `${base}.`;
+        msgEl.className = 'ig-generate-msg error';
+        msgEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = 'tentar de novo';
+      } catch (err) {
+        msgEl.textContent = 'erro de conexão ao publicar. confira no Instagram antes de tentar de novo.';
+        msgEl.className = 'ig-generate-msg error';
+        msgEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = 'tentar de novo';
+        console.error(err);
       }
     });
 

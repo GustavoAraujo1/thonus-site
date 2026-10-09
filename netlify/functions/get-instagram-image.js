@@ -1,20 +1,23 @@
 /* ==========================================================
    THONUS Engenharia — Gerador de posts para Instagram
-   Function HTTP simples: devolve o PNG de um slide específico
+   Function HTTP simples: devolve o JPEG de um slide específico
    (?slide=1..N) gravado pela generate-instagram-post.js no
-   Netlify Blobs. Lido pelo instagram/painel.html.
-   Protegida por login — ver netlify/functions/lib/auth.js.
+   Netlify Blobs. Lido pelo instagram/painel.html (com sessão) e
+   pela Meta na hora de publicar (com ?t=, token curto de imagem
+   gerado por publish-instagram-post.js).
+   Protegida — ver netlify/functions/lib/auth.js.
    ========================================================== */
 
 const { getStore } = require('@netlify/blobs');
-const { isAuthenticated } = require('./lib/auth');
+const { isAuthenticated, verifyMediaToken } = require('./lib/auth');
 
 exports.handler = async (event) => {
-  if (!isAuthenticated(event)) {
+  const params = event.queryStringParameters || {};
+  if (!isAuthenticated(event) && !verifyMediaToken(params.t)) {
     return { statusCode: 401, body: 'Não autorizado.' };
   }
 
-  const slide = parseInt((event.queryStringParameters || {}).slide, 10);
+  const slide = parseInt(params.slide, 10);
   if (!Number.isInteger(slide) || slide < 1) {
     return { statusCode: 400, body: 'Parâmetro "slide" inválido.' };
   }
@@ -24,7 +27,7 @@ exports.handler = async (event) => {
     siteID: process.env.BLOBS_SITE_ID,
     token: process.env.BLOBS_TOKEN
   });
-  const data = await store.get(`slide-${slide}.png`, { type: 'arrayBuffer' });
+  const data = await store.get(`slide-${slide}.jpg`, { type: 'arrayBuffer' });
 
   if (!data) {
     return { statusCode: 404, body: 'Slide não encontrado.' };
@@ -33,7 +36,7 @@ exports.handler = async (event) => {
   return {
     statusCode: 200,
     headers: {
-      'Content-Type': 'image/png',
+      'Content-Type': 'image/jpeg',
       'Cache-Control': 'private, no-store'
     },
     isBase64Encoded: true,
